@@ -1,3 +1,9 @@
+/*
+Garrett Partenza
+September 10th, 2020
+CS 7180 Advanced Perception
+*/
+
 #include <iostream>
 #include <vector>
 #include <opencv2/core.hpp>
