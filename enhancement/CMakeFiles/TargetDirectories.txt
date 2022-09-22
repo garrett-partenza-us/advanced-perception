@@ -1,0 +1,5 @@
+/Users/jamie/documents/CS7180/image_enhancement/advanced-perception/enhancement/CMakeFiles/DSIHE.dir
+/Users/jamie/documents/CS7180/image_enhancement/advanced-perception/enhancement/CMakeFiles/BBHE.dir
+/Users/jamie/documents/CS7180/image_enhancement/advanced-perception/enhancement/CMakeFiles/contrast.dir
+/Users/jamie/documents/CS7180/image_enhancement/advanced-perception/enhancement/CMakeFiles/edit_cache.dir
+/Users/jamie/documents/CS7180/image_enhancement/advanced-perception/enhancement/CMakeFiles/rebuild_cache.dir
