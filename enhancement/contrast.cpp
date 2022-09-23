@@ -1,6 +1,6 @@
 /*
 Garrett Partenza
-September 10th, 2020
+September 10th, 2022
 CS 7180 Advanced Perception
 */
 
@@ -37,7 +37,6 @@ int main(int argc, char *argv[])
         // Normalize histogram
         Mat hist_normed;
         hist.convertTo(hist_normed, CV_32F, 1.0/img.total());
-        
         // Convert normalized histogram to vector
         hist_normed = hist_normed.reshape(1, hist_normed.total()*hist_normed.channels());
         std::vector<float> vec = hist_normed.isContinuous()? hist_normed : hist_normed.clone();
