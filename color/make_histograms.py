@@ -84,19 +84,22 @@ def main():
     """
     hists = []
     for img in tqdm(os.listdir(dataset_path+"train/PNG")):
-        #read image
-        cam = cv2.imread(dataset_path+"train/PNG/"+img, cv2.IMREAD_UNCHANGED)
-        #bgr -> rgb
-        cam = cv2.cvtColor(cam, cv2.COLOR_BGR2RGB)
-        #uint16 -> float64
-        cam = cam.astype(np.float64)
-        #black level and saturation
-        cam = linearize(cam)
-        #not sure what this step means
-        cam = to_rgb(cam)
-        #compute binary histogram
-        hist = binarize(cam, steps=64)
-        hists.append((img, hist)) 
+        try:
+            #read image
+            cam = cv2.imread(dataset_path+"train/PNG/"+img, cv2.IMREAD_UNCHANGED)
+            #bgr -> rgb
+            cam = cv2.cvtColor(cam, cv2.COLOR_BGR2RGB)
+            #uint16 -> float64
+            cam = cam.astype(np.float64)
+            #black level and saturation
+            cam = linearize(cam)
+            #not sure what this step means
+            cam = to_rgb(cam)
+            #compute binary histogram
+            hist = binarize(cam, steps=64)
+            hists.append((img, hist))
+        except:
+            print("failed for {}".format(img))
     hist_df = pd.DataFrame(hists, columns=["image", "histogram"])
     hist_df.to_csv("histograms_train.csv")
     
