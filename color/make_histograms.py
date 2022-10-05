@@ -95,14 +95,12 @@ def main():
             cam = linearize(cam)
             #not sure what this step means
             cam = to_rgb(cam)
+            cv2.imwrite(dataset_path+"train/processed/{}".format(img), cam)
             #compute binary histogram
-            hist = binarize(cam, steps=64)
-            hists.append((img, hist))
+#             hist = binarize(cam, steps=64)
+#             hists.append((img, hist))
         except:
             print("failed for {}".format(img))
-    hist_df = pd.DataFrame(hists, columns=["image", "histogram"])
-    hist_df.to_csv("histograms_train.csv")
-    
     
 if __name__=="__main__":
     main()
