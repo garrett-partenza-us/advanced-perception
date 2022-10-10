@@ -118,3 +118,18 @@ plt.figure(figsize=(12,8))
 plt.title("Training Loss (MLP)")
 plt.plot(losses)
 plt.savefig("convnet.png")
+
+with torch.no_grad():
+    
+    losses = []
+                   
+    for batch in loader_test:
+        
+        optimizer.zero_grad()
+        x, y = batch 
+        x, y = x.to(device), y.to(device)
+        pred = model(x.float())
+        loss = loss_func(model(x.float()), y.float())
+        losses.append(loss.item())
+        
+print("Final Test MSE: {}".format(np.mean(losses)))
