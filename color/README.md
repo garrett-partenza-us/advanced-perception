@@ -1,6 +1,6 @@
-Garrett Partenza and Jiameng Sun
-October 11, 2022
-CS7180 Advanced Perception
+#### Garrett Partenza and Jiameng Sun
+#### October 11, 2022
+#### CS7180 Advanced Perception
 
 ### Abstract
 Inspired by Estimating the scene illumination chromaticity by using a neural network, we implement a multilayer neural network that recovers the illumination chromaticity with only an input image. The neural network consists of two layers of perceptrons and is trained with a database for color constancy called SimpleCube++. The illumination chromaticity is used to render the image under neutral light with the diagonal model. Except for implementing the same neural network presented in the paper (original_net), we created a modern net with similar two layers of perceptrons but uses ReLU instead of Sigmoid as the activation function and uses mean square error instead of Euclidean distance as the error metric. Finally, we created a CNN network trained with the same dataset for the same task as the perceptron networks. 
