@@ -5,20 +5,32 @@ import numpy as np
 import torch
 import os
 import pandas as pd
+from torch.optim.lr_scheduler import ExponentialLR
 
-BATCH_SIZE = 64
+
+BATCH_SIZE = 8
 
 with open('img_tensors.pickle', 'rb') as handle:
     img_tensors = pickle.load(handle)
+    
+def get_n_params(model):
+    pp=0 
+    for p in list(model.parameters()):
+        nn=1
+        for s in list(p.size()):
+            nn = nn*s
+        pp += nn
+    return pp
     
 df = pd.read_csv("SimpleCube++/train/gt.csv")
 
 labels = []
 
 for img in os.listdir("SimpleCube++/train/processed"):
-    row = df[df["image"]==img.split(".")[0].strip()] 
-    label = [row.mean_r.iloc[0], row.mean_g.iloc[0]]
-    labels.append(label)
+    if not img.startswith("."): 
+        row = df[df["image"]==img.split(".")[0].strip()] 
+        label = [row.mean_r.iloc[0], row.mean_g.iloc[0]]
+        labels.append(label)
 
 labels = np.array(labels)
 
@@ -73,12 +85,13 @@ class ConvNet(nn.Module):
 from tqdm import tqdm
 
 model = ConvNet()
+print(get_n_params(model))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr = 1e-3)
 loss_func = torch.nn.MSELoss()
-
-EPOCHS = 100
+scheduler = ExponentialLR(optimizer, gamma =0.7)
+EPOCHS = 10
 
 losses = []
 
@@ -98,7 +111,7 @@ for epoch in range(EPOCHS):
         epoch_loss.append(loss.item())
 
     print("Epoch {}: MSE: {}".format(epoch, loss))
-        
+    scheduler.step()
 import matplotlib.pyplot as plt
 
 plt.figure(figsize=(12,8))
