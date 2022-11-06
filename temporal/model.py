@@ -1,9 +1,17 @@
+# Garrett Partenza and Jamie Sun
+# November 5, 2022
+# CS Advanced Perception
+
+
+# Imports 
 import torch
 from torch import nn
 from einops import rearrange
 import math
 import time
 
+
+# feed forward class for transformer
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, last):
         super().__init__()
@@ -20,6 +28,7 @@ class FeedForward(nn.Module):
         return self.net(x)
 
     
+# attention class for transformer
 class Attention(nn.Module):
     def __init__(self, dim, heads = 8, dim_head = 64):
         super().__init__()
@@ -41,7 +50,8 @@ class Attention(nn.Module):
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
 
-    
+
+# transformer class
 class Transformer(nn.Module):
     def __init__(self, batch_size, patches, frames, dim, depth, heads, dim_head, mlp_dim, out_dim):
         super().__init__()
@@ -71,6 +81,7 @@ class Transformer(nn.Module):
         return x
     
     
+# convnet class
 class ConvNet(nn.Module):
     def __init__(self, batch_size, patches, frames, patch_size):
         super(ConvNet, self).__init__()
@@ -94,8 +105,9 @@ class ConvNet(nn.Module):
         return x
     
         
+# our model class (combined convnet and transformer with reshape)
 class SuperNet(nn.Module):
-    def __init__(self, batch_size, patches, frames, width, height):
+    def __init__(self, batch_size, patches, frames, width, height, blocks=6):
         super(SuperNet, self).__init__()
         self.batch_size = batch_size
         self.patches = patches
@@ -103,6 +115,7 @@ class SuperNet(nn.Module):
         self.width = width
         self.height = height
         self.patch_size = int(math.sqrt((width*height)/patches))
+        self.blocks = blocks
         assert (width*height)%self.patch_size == 0
         self.convnet = ConvNet(
             batch_size, 
@@ -115,7 +128,7 @@ class SuperNet(nn.Module):
             patches,
             frames,
             dim=1024,
-            depth=3,
+            depth=blocks,
             heads=8,
             dim_head=64,
             mlp_dim=2048,

@@ -1,3 +1,9 @@
+# Garrett Partenza and Jamie Sun
+# November 5, 2022
+# CS Advanced Perception
+
+
+# Imports  
 from torch.utils.data import DataLoader
 from sklearn.model_selection import train_test_split
 from src.datasets import *
@@ -10,19 +16,25 @@ import matplotlib.pyplot as plt
 from torchvision.transforms import Compose, Resize, InterpolationMode, Normalize, Lambda
 from helper import *
 
-torch.backends.cudnn.benchmark = True
-y_transform  = make_transforms_JIF()
 
+# speed up training with benchmarking
+torch.backends.cudnn.benchmark = True
+
+# generate required transforms
+y_transform  = make_transforms_JIF()
 lr_resize = T.Resize((400,400))
 hr_resize = T.Resize((1024,1024))
-
 transforms = make_transforms_JIF(lr_bands_to_use='true_color', radiometry_depth=12)
+
+# implement multiprocessing
 multiprocessing_manager = Manager()
 
+# file system paths to dataset
 dataset_root = '/scratch/partenza.g/'
 hr_dataset_folder = 'hr_dataset/12bit/'
 lr_dataset_folder = 'lr_dataset/'
 
+# hyperparamters
 BATCH_SIZE = 16
 HOLDOUT = 0.2
 PATCHES = 256
@@ -32,6 +44,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 EPOCHS = 10
 
 
+# function to plot and save generated images on test set every epoch
 def plot(x, epoch):
     x = make_grid(x, normalize=True, scale_each=True)
     x = x.clone().detach()
@@ -48,7 +61,8 @@ def plot(x, epoch):
     plt.savefig("plots/epoch_{}.png".format(epoch))
     plt.clf()
     
-    
+
+# function to generate index dataloaders for all illegal mining images
 def generate_dataloaders():
     
     lr = SatelliteDataset(
@@ -87,76 +101,78 @@ def generate_dataloaders():
     return dataset, train, val, test
     
 
+# main training loop
 def main():
     
+    #initialize objects
     print("Generating dataloaders...")
     dataset, train, val, test = generate_dataloaders()
     print("Train ({}), Val ({}), Test ({})".format(len(train)*BATCH_SIZE, len(val)*BATCH_SIZE, len(test)*BATCH_SIZE))
     print("Initializing model parameters...")
-    model = SuperNet(BATCH_SIZE, PATCHES, FRAMES, WIDTH, HEIGHT).to(DEVICE)
+    model = SuperNet(BATCH_SIZE, PATCHES, FRAMES, WIDTH, HEIGHT, blocks=6).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-3)
     loss_func = torch.nn.MSELoss()
     scheduler = ExponentialLR(optimizer, gamma =0.7)
-    
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    params = sum([np.prod(p.size()) for p in model_parameters])
+    print("Number of trainable paramters: {}".format(params))
     print("\n\n", "*"*30, "\n\n", "Begging training\n\n", "*"*30, "\n\n")
     
+    # train
     loss_train, loss_val = [], []
-    
     for epoch in range(EPOCHS):
-        
         temp = []
-
         for batch in tqdm(train):
             optimizer.zero_grad(set_to_none=True)
             x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch]).to(DEVICE)
-            y = torch.stack([hr_resize(y_transform['hr'].transforms[1](dataset[idx]['hr'])) for idx in batch]).flatten(end_dim=1).to(DEVICE)
+            y = torch.stack(
+                [hr_resize(y_transform['hr'].transforms[1](dataset[idx]['hr'])) for idx in batch]
+            ).flatten(end_dim=1).to(DEVICE)
             with torch.autocast(device_type="cuda"):
                 out = model(x.float())
                 loss = loss_func(out, y.float())
             loss.backward()
             optimizer.step()
             
+            # free memory
             x.detach().cpu()
             y.detach().cpu()
             out.detach().cpu()
             loss.detach().cpu()
-            
             loss_train.append(loss.item())
             temp.append(loss.item())
-            
             del x, y, out, loss
             torch.cuda.empty_cache()
 
         scheduler.step()
         torch.save(model.state_dict(), "models/epoch_{epoch}.pth".format(epoch=epoch))
         torch.save(optimizer.state_dict(), "models/epoch_{epoch}.pth".format(epoch=epoch))
-            
         print("Epoch {}: Train MSE: {}".format(epoch, torch.mean(torch.tensor(temp))))
-        
         del temp
         
+        # validation
         temp = []
-        
         with torch.no_grad():
             for batch in val:
                 optimizer.zero_grad(set_to_none=True)
                 x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch]).to(DEVICE)
-                y = torch.stack([hr_resize(y_transform['hr'].transforms[1](dataset[idx]['hr'])) for idx in batch]).flatten(end_dim=1).to(DEVICE)
+                y = torch.stack(
+                    [hr_resize(y_transform['hr'].transforms[1](dataset[idx]['hr'])) for idx in batch]
+                ).flatten(end_dim=1).to(DEVICE)
                 out = model(x.float())
                 loss = loss_func(out, y.float())
                 
+                # free memory
                 x.detach().cpu()
                 y.detach().cpu()
                 out.detach().cpu()
                 loss.detach().cpu()
-                
                 temp.append(loss.item())
                 loss_val.append(loss.item())
-                
                 del x, y, out, loss
                 torch.cuda.empty_cache()
                 
-        
+        # generate image from test
         with torch.no_grad():
             for batch in test:
                 optimizer.zero_grad(set_to_none=True)
@@ -165,14 +181,12 @@ def main():
                 x.detach().cpu()
                 out.detach().cpu()
                 plot(out.detach().cpu(), epoch)
-
+                # free memory
                 del x, out
                 torch.cuda.empty_cache()
-                
                 break
 
         print("Epoch {}: Test MSE: {}".format(epoch, torch.mean(torch.tensor(temp))))
-        
         del temp
         
     np.save("models/training_loss.npy", np.array(loss_train))
