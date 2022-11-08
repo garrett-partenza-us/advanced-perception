@@ -1,10 +1,12 @@
 # Learning Multi-Frame Super Resolution via Patch-Attention
 
+[Wiki Report](https://wiki.khoury.northeastern.edu/display/~mucc001/CS+7180+Assignment+3%3A+Transformer-based+network+for+multiple+images+Super-resoluton)
+
 Garrett Partenza and Jamie Sun
 November 5, 2022
 CS Advanced Perception
 
-/emph{It may not be the best super-resolution model, but its a super-resolution model :)}
+* It may not be the best super-resolution model, but its a super-resolution model :) *
 
 ### Codebase Directory: Explanation of files along with how to execute.
 1. requirements.txt - pip library requirements file
@@ -32,7 +34,7 @@ High-resolution satellite images are costly to produce and hard to access. There
 Out model consists of both a convolutional model and a trasnformer model. The input to the model is a sequence of 8 low resolution satelite images, and the output is the corresponding high resolution image. Our methodology first chunks the low resoltuion image into patches, then vectorizes the patches into a single feature vector using a conventional convolutional neural network. Then, we perform attention between the corresponding patches across the eight frames. The idea here is that each image patch contains some portion of information needed to produce the higher resolution patch, and thus multi-headed attention can facilitate in extracting this information between the frames. Finally, the two-dimensional output of the last transformer block is reshaped into the three-dimensional channel high resolution image. Our model had 39,175,424 trainable paramters and was trained on a T4 GPU using the Northeastern HPC. Our loss function was the mean squared error between the predicted image and ground truth. 
 
 ### Dataset
-The dataset chosen for this project is the WorldStrat dataset created by Cornebise et al.(2022). The dataset consists of nearly 10,000 km² of free high-resolution and matched low-resolution satellite imagery of unique locations. The dataset contains Airbus SPOT 6/7 satellites’ high-resolution images of up to 1.5 m/pixel and multiple low-resolution images from the freely accessible Sentinel-2 satellites at 10 m/pixel, which are temporally matched with each high-resolution image. The dataset makes a stratified representation of all types of land use across the world: from agriculture to ice caps, from forests to multiple urbanization densities, and assigns labels for locations such as sites of humanitarian interest, illegal mining sites, and settlements of persons at risk. Due to computational constraints, we selected a subset of the dataset which images suspected illegal mining sites. More reguarding the dataset can be found on their /href[homepage][https://zenodo.org/record/6810792#.Y2gCzuzMLBc]. 
+The dataset chosen for this project is the WorldStrat dataset created by Cornebise et al.(2022). The dataset consists of nearly 10,000 km² of free high-resolution and matched low-resolution satellite imagery of unique locations. The dataset contains Airbus SPOT 6/7 satellites’ high-resolution images of up to 1.5 m/pixel and multiple low-resolution images from the freely accessible Sentinel-2 satellites at 10 m/pixel, which are temporally matched with each high-resolution image. The dataset makes a stratified representation of all types of land use across the world: from agriculture to ice caps, from forests to multiple urbanization densities, and assigns labels for locations such as sites of humanitarian interest, illegal mining sites, and settlements of persons at risk. Due to computational constraints, we selected a subset of the dataset which images suspected illegal mining sites. More reguarding the dataset can be found on their [homepage](https://zenodo.org/record/6810792#.Y2gCzuzMLBc). 
 
 ### Results: Show the result of your work on multiple appropriate images, showing both the strengths and weaknesses of the method. Include a short description with each result image indicating anything special about it.
 Our model resulted in overall poor performance and was unable to produce reasonable imagery. However, we attribute this to time constraints, as we spent most of our time developing the training pipeline. As a result, we were only able to train the model once, and did not begin attempting to conduct hyperparameter tuning or model debugging. We hypothesize that, due to the large number of tensor reshapes in our model, there is a bug causing either spatial or temporal information to be lost. 
