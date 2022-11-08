@@ -19,6 +19,7 @@ from helper import *
 
 # speed up training with benchmarking
 torch.backends.cudnn.benchmark = True
+torch.cuda.empty_cache()
 
 # generate required transforms
 y_transform  = make_transforms_JIF()
@@ -35,13 +36,13 @@ hr_dataset_folder = 'hr_dataset/12bit/'
 lr_dataset_folder = 'lr_dataset/'
 
 # hyperparamters
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 HOLDOUT = 0.2
 PATCHES = 256
 FRAMES = 8
 WIDTH, HEIGHT = 400, 400
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-EPOCHS = 10
+EPOCHS = 30
 
 
 # function to plot and save generated images on test set every epoch
@@ -63,14 +64,14 @@ def plot(x, epoch):
     
 
 # function to generate index dataloaders for all illegal mining images
-def generate_dataloaders():
+def generate_dataloaders(batch_size=8):
     
     lr = SatelliteDataset(
         root=os.path.join(dataset_root, lr_dataset_folder, "ASMSpotter*", "L2A", ""),
         file_postfix="-L2A_data.tiff",
         transform=transforms["lr"],
         number_of_revisits=8,
-        bands_to_read=SPOT_RGB_BANDS,
+        bands_to_read=S2_ALL_12BANDS["true_color"],
         multiprocessing_manager=multiprocessing_manager
     )
 
@@ -95,24 +96,31 @@ def generate_dataloaders():
     np.save("split/train.npy", np.array(train))
     np.save("split/val.npy", np.array(val))
     np.save("split/test.npy", np.array(test))
-    train = DataLoader(train, batch_size=BATCH_SIZE, shuffle=True, drop_last=True, num_workers=4, pin_memory=True)
-    val = DataLoader(val, batch_size=BATCH_SIZE, shuffle=True, drop_last=True, num_workers=4, pin_memory=True)
-    test = DataLoader(test, batch_size=BATCH_SIZE, shuffle=True, drop_last=True, num_workers=4, pin_memory=True)
+    train = DataLoader(train, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4, pin_memory=True)
+    val = DataLoader(val, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4, pin_memory=True)
+    test = DataLoader(test, batch_size=batch_size, shuffle=True, drop_last=True, num_workers=4, pin_memory=True)
     return dataset, train, val, test
     
 
+def patch(x):
+    kernel_size, stride = 25, 25
+    x = x.unfold(1, 25, 25).unfold(2, 25, 25)
+    x = x.contiguous().view(x.size(0), -1, 25, 25).permute(1,0,2,3)
+    return x
+    
+    
 # main training loop
 def main():
     
     #initialize objects
     print("Generating dataloaders...")
-    dataset, train, val, test = generate_dataloaders()
+    dataset, train, val, test = generate_dataloaders(batch_size=BATCH_SIZE)
     print("Train ({}), Val ({}), Test ({})".format(len(train)*BATCH_SIZE, len(val)*BATCH_SIZE, len(test)*BATCH_SIZE))
     print("Initializing model parameters...")
-    model = SuperNet(BATCH_SIZE, PATCHES, FRAMES, WIDTH, HEIGHT, blocks=6).to(DEVICE)
+    model = SuperNet(BATCH_SIZE, PATCHES, FRAMES, WIDTH, HEIGHT, blocks=8).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr = 1e-3)
     loss_func = torch.nn.MSELoss()
-    scheduler = ExponentialLR(optimizer, gamma =0.7)
+    scheduler = ExponentialLR(optimizer, gamma =0.95)
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     params = sum([np.prod(p.size()) for p in model_parameters])
     print("Number of trainable paramters: {}".format(params))
@@ -124,10 +132,18 @@ def main():
         temp = []
         for batch in tqdm(train):
             optimizer.zero_grad(set_to_none=True)
-            x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch]).to(DEVICE)
+            x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch])
+            x = torch.stack(
+            [
+                patch(img) for img in x.flatten(end_dim=1)
+            ]).reshape(BATCH_SIZE, FRAMES, PATCHES, 3, 25, 25)
+            x.requires_grad=True
+            x = x.to(DEVICE)
             y = torch.stack(
                 [hr_resize(y_transform['hr'].transforms[1](dataset[idx]['hr'])) for idx in batch]
-            ).flatten(end_dim=1).to(DEVICE)
+            ).flatten(end_dim=1)
+            y.requires_grad=True
+            y = y.to(DEVICE)
             with torch.autocast(device_type="cuda"):
                 out = model(x.float())
                 loss = loss_func(out, y.float())
@@ -145,8 +161,10 @@ def main():
             torch.cuda.empty_cache()
 
         scheduler.step()
-        torch.save(model.state_dict(), "models/epoch_{epoch}.pth".format(epoch=epoch))
-        torch.save(optimizer.state_dict(), "models/epoch_{epoch}.pth".format(epoch=epoch))
+        
+        if epoch%5==0:
+            torch.save(model.state_dict(), "models/epoch_{epoch}.pth".format(epoch=epoch))
+            torch.save(optimizer.state_dict(), "models/epoch_{epoch}.pth".format(epoch=epoch))
         print("Epoch {}: Train MSE: {}".format(epoch, torch.mean(torch.tensor(temp))))
         del temp
         
@@ -155,10 +173,16 @@ def main():
         with torch.no_grad():
             for batch in val:
                 optimizer.zero_grad(set_to_none=True)
-                x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch]).to(DEVICE)
+                x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch])
+                x = torch.stack(
+                [
+                    patch(img) for img in x.flatten(end_dim=1)
+                ]).reshape(BATCH_SIZE, FRAMES, PATCHES, 3, 25, 25)
+                x = x.to(DEVICE)
                 y = torch.stack(
                     [hr_resize(y_transform['hr'].transforms[1](dataset[idx]['hr'])) for idx in batch]
-                ).flatten(end_dim=1).to(DEVICE)
+                ).flatten(end_dim=1)
+                y = y.to(DEVICE)
                 out = model(x.float())
                 loss = loss_func(out, y.float())
                 
@@ -176,7 +200,12 @@ def main():
         with torch.no_grad():
             for batch in test:
                 optimizer.zero_grad(set_to_none=True)
-                x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch]).to(DEVICE)
+                x = torch.stack([lr_resize(dataset[idx]['lr']) for idx in batch])
+                x = torch.stack(
+                [
+                    patch(img) for img in x.flatten(end_dim=1)
+                ]).reshape(BATCH_SIZE, FRAMES, PATCHES, 3, 25, 25)
+                x = x.to(DEVICE)
                 out = model(x.float())[0]
                 x.detach().cpu()
                 out.detach().cpu()

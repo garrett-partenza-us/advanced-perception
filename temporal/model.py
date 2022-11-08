@@ -9,7 +9,8 @@ from torch import nn
 from einops import rearrange
 import math
 import time
-
+from torchvision.utils import make_grid
+import matplotlib.pyplot as plt
 
 # feed forward class for transformer
 class FeedForward(nn.Module):
@@ -69,12 +70,13 @@ class Transformer(nn.Module):
         self.batch_size = batch_size
         self.patches = patches
         self.frames = frames
+        self.dim = dim
+        self.out_dim = out_dim
             
     def forward(self, x):
-        x = x.reshape(self.batch_size*self.patches, self.frames, -1)
         for d in range(self.depth):
             attn, ff = self.layers[d]
-            x = attn(x) + x
+            x = torch.mul(nn.Softmax(dim=2)(attn(x)), x) + x
             x = ff(x)
             if d!=self.depth-1:
                 x+=x
@@ -96,12 +98,12 @@ class ConvNet(nn.Module):
         self.patch_size = patch_size
         
     def forward(self, x):
-        x = x.reshape(-1,3,self.patch_size,self.patch_size)
+        x = x.reshape(self.batch_size*self.frames*self.patches, 3, self.patch_size, self.patch_size)
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = x.flatten(start_dim=1)
-        x = x.reshape(self.batch_size, self.patches, self.frames, 1024)
+        x = x.reshape(self.batch_size, self.frames, self.patches, 1024)
         return x
     
         
@@ -130,14 +132,40 @@ class SuperNet(nn.Module):
             dim=1024,
             depth=blocks,
             heads=8,
-            dim_head=64,
+            dim_head=128,
             mlp_dim=2048,
             out_dim=1536
         )
-        
+
     def forward(self, x):
-        x = x.reshape(self.batch_size, self.patches, self.frames, 3, self.patch_size, self.patch_size)
+        # B F P 3 25 25
         x = self.convnet(x)
+        # B F P feat
+        x = x.permute(0,2,1,3)
+        # B P F feat
+        x = x.reshape(self.batch_size*self.patches, self.frames, 1024)
+        # B*P F 1024
         x = self.transformer(x)
+        # B*P F 1536
+        x = x.reshape(self.batch_size, self.patches, self.frames, 1536)
+        # B P F 1536
+        x = x.permute(0,2,1,3)
+        # B F P 1536
         x = x.reshape(self.batch_size, 3, 1024, 1024)
         return x
+    
+    def plot(self, x, title):
+        x = make_grid(x, normalize=True, scale_each=True)
+        x = x.cpu().clone().detach()
+        if x.dtype == torch.uint8:
+            x = x / 255.0
+        if x.is_floating_point():
+            if x.ndim == 3 and x.shape[0] >= 3:
+                # Channels first to channels last [1,2,3] -> [3,2,1]
+                x = x.permute(1, 2, 0)
+                plt.imshow(x, vmin=0, vmax=1, interpolation="nearest")
+            else:
+                x = x[0]
+                plt.imshow(x)
+        plt.savefig("plots/{}.png".format(title))
+        plt.clf()
