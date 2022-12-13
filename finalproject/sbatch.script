@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:t4:1
+#SBATCH --time=08:00:00
+#SBATCH --job-name=sr
+#SBATCH --mem=32GB
+#SBATCH --ntasks=1
+#SBATCH --output=esrcnn.out
+#SBATCH --error=esrcnn.err
+
+cd /home/partenza.g/tinymodels/vit
+source env/bin/activate
+GPU=1 python train-sat-rep.py
