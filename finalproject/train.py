@@ -1,5 +1,6 @@
 # standard
 import copy
+import os
 
 # external
 import pickle
@@ -14,6 +15,9 @@ from patchify import patchify
 # raise error on overflow caused by gelu
 np.seterr(all="warn", over="raise")
 
+if not os.path.exists("plots/"):
+    os.makedirs("plots")
+
 # MODEL CHOICE
 from models.espcnn import Net
 
@@ -22,8 +26,8 @@ EPOCHS = 1
 BATCH_SIZE = 16
 LR = 1e-3
 
-lr_path = "/home/partenza.g/tinymodels/Data/LR/{}.png"
-hr_path = "/home/partenza.g/tinymodels/Data/HR/{}.png"
+lr_path = "data/LR/{}.png"
+hr_path = "data/HR/{}.png"
 
 def get_batch(bs, test=False):
     idxs = np.random.randint(1,81,bs) if not test else np.random.randint(81,100,bs)
@@ -145,7 +149,7 @@ for i in tqdm(range(EPOCHS)):
         # stack train and test images
         img_stack = np.vstack((train_img, test_img))
         img_stack = (img_stack*255).astype(np.uint8)
-        cv2.imwrite("/home/partenza.g/tinymodels/net/plots/plot_{}.jpg".format(i), img_stack)
+        cv2.imwrite("plots/plot_{}.jpg".format(i), img_stack)
         
         del pred_train, target_train, pred_test, target_test, train_img, test_img, img_stack, loss_test
      
@@ -167,7 +171,7 @@ for i in tqdm(range(EPOCHS)):
         pred_test = np.concatenate(list(p[0].detach().cpu().data for p in (p1, p2, p3)), axis=-1)
         pred_test = (pred_test*255).astype(np.uint8)
         
-        cv2.imwrite("/home/partenza.g/tinymodels/net/plots/gif_{}.jpg".format(i), pred_test)
+        cv2.imwrite("plots/gif_{}.jpg".format(i), pred_test)
         
         del pred_test
         
