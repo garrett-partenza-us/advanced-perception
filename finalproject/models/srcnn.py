@@ -1,3 +1,6 @@
+# Garrett Partenza and Jiameng Sung
+# CS 7180 Advanced Computer Vision
+# December 14th, 2022
 from tinygrad.tensor import Tensor
 from tinygrad.nn import BatchNorm2D
 import numpy as np
